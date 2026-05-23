@@ -1,0 +1,22 @@
+# Build output stuff
+build/
+cmake-build-debug/
+cmake-build-release/
+
+#vscode files
+.vscode/
+
+#macOS
+.DS_Store
+
+#Executables
+orderbook
+*.out
+
+#CMake generated files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+compile_commands.json
+
