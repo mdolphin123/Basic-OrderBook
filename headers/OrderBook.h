@@ -16,6 +16,8 @@
 #include <cmath>
 #include <mutex>
 #include <thread>
+#include <condition_variable>
+#include <atomic>
 
 
 #include "Usings.h"
@@ -56,9 +58,9 @@ class OrderBook {
         mutable std::mutex ordersMutex_; //declares regular mutex for multithreading
         
         //for the pruning goodforday
-        std::thread ordersPruneThread_;
         std::condition_variable shutdownConditionVariable_;
         std::atomic<bool> shutdown_{ false };
+        std::thread ordersPruneThread_; //Order matters in C++ so you need to declare at the end!
         void PruneGoodForDayOrders();
 
         void CancelOrders(OrderIds orderIds);

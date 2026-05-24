@@ -69,12 +69,12 @@ TEST_P(OrderBookTestsFixture, OrderBookTestSuite) { //creates parametrized test
 
 INSTANTIATE_TEST_SUITE_P(Tests, OrderBookTestsFixture, googletest::ValuesIn({
     "Match_GoodTillCancel.txt",
-    //"Match_FillandKill.txt",
-    //"Match_FillorKill_Hit.txt",
-    //"Match_FillorKill_Miss.txt",
+    "Match_FillandKill.txt",
+    "Match_FillorKill_Hit.txt",
+    "Match_FillorKill_Miss.txt",
     "Cancel_Success.txt",
-    //"Modify_Side.txt",
-    //"Match_Market.txt"
+    "Modify_Side.txt",
+    "Match_Market.txt"
 
 }));
 

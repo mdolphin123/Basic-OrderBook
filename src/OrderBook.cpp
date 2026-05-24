@@ -25,53 +25,72 @@
 
 //Added background threads on all functions that modify orders_, bids_, or asks_ because there is a background thread!
 
-void OrderBook::PruneGoodForDayOrders() { //background thread, removes goodforday orders
+
+void OrderBook::PruneGoodForDayOrders()
+{    
+    //background thread, removes goodforday orders
     using namespace std::chrono;
-    const auto end = hours(16); //duration object representing 16 hours, market close at 4PM
+    const auto end = hours(16);
 
-    while(true) { //independent from main thread, background thread!
-        const auto now = system_clock::now(); //get the current timestamp
-        const auto now_c = system_clock::to_time_t(now); //convert the chrono timestamp into a time_t timestamp
-        std::tm now_parts; //creates a tm structure that stores human readable calendar/time fields
-        localtime_r(&now_c, &now_parts); //function that stores the current time into that structure
+	while (true) { //independent from main thread, background thread!
+		const auto now = system_clock::now(); //get the current timestamp
+		const auto now_c = system_clock::to_time_t(now); //duration object representing 16 hours, market close at 4PM
+		std::tm now_parts; //creates a tm structure that stores human readable calendar/time fields
+		localtime_r(&now_c, &now_parts); //function that stores the current time into that structure
 
-        if(now_parts.tm_hour >= end.count()) {
+		if (now_parts.tm_hour >= end.count()) {
             now_parts.tm_mday += 1; //moves calendar day forward by 1 if time is after 4PM
         }
 
-        //set target time to market close
-        now_parts.tm_hour = end.count();
-        now_parts.tm_min = 0;
-        now_parts.tm_sec = 0;
+         //set target time to market close
+		now_parts.tm_hour = end.count();
+		now_parts.tm_min = 0;
+		now_parts.tm_sec = 0;
 
-        auto next = system_clock::from_time_t(mktime(&now_parts)); //converts back into timestamp
-        auto till = next - now + milliseconds(100); //if market is not closed, sleep until it closes! 100ms for safety
+		auto next = system_clock::from_time_t(mktime(&now_parts)); //converts back into timestamp
+		auto till = next - now + milliseconds(100); //if market is not closed, sleep until it closes! 100ms for safety
 
-        OrderIds orderIds; //list of order ids to be deleted
+		{ //create a locked scope! Don't want the main thread to modify orders_ when we are pruning
+			std::cout << "in first lock" << std::endl;
+            std::unique_lock<std::mutex> ordersLock(ordersMutex_);  //creating unique lock object ordersLock, passing in the mutex
 
-        { //create a locked scope! Don't want the main thread to modify orders_ when we are pruning
-            std::unique_lock<std::mutex> ordersLock(ordersMutex_); //creating unique lock object ordersLock, passing in the mutex
-
-            if(shutdown_.load(std::memory_order_acquire) || shutdownConditionVariable_.wait_for(ordersLock, till) == std::cv_status::no_timeout) {
-                return; //if shutdown requested, exit the pruning thread! Shutdown logic for the destructor
-            }
-
-            for(const auto& [_, entry] : orders_) {
-                const auto& [order, __] = entry;
+			/*if (shutdown_.load(std::memory_order_acquire) ||
+				shutdownConditionVariable_.wait_for(ordersLock, till) == std::cv_status::no_timeout) //thread gets put to sleep
+				return; //if shutdown requested, exit the pruning thread! Shutdown logic for the destructor
+            */
+            bool shouldShutdown = shutdownConditionVariable_.wait_for(ordersLock, till, [this] {
+                return shutdown_.load(std::memory_order_acquire);
+            });
                 
-                if(order -> GetOrderType() != OrderType::GoodForDay) {
-                    continue;
-                }
-
-                orderIds.push_back(order -> GetOrderId()); //add the GoodForDay ids to the list
+            if (shouldShutdown) {
+                return;
             }
+		}
+        if (shutdown_.load(std::memory_order_acquire)) {
+            return;
         }
+        std::cout << "after first lock" << std::endl;
 
-        CancelOrders(orderIds); //cancel these orders! get a new method named cancel ORDERS (multiple orders)
+		OrderIds orderIds;
 
-    }
+		{
+			std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
+            std::cout << "in second lock" << std::endl;
+
+			for (const auto& [id, entry] : orders_)
+			{
+				const auto& [order, _] = entry;
+
+				if (order->GetOrderType() != OrderType::GoodForDay)
+					continue;
+
+				orderIds.push_back(order->GetOrderId()); //add the GoodForDay ids to the list
+			}
+		}
+        std::cout << "after second lock" << std::endl;
+		CancelOrders(orderIds); //cancel these orders! get a new method named cancel ORDERS (multiple orders)
+	}
 }
-
 
 //both of these functions make use of cancelorderinternal, which only cancels one order
 void OrderBook::CancelOrders(OrderIds orderIds) { //to cancel multiple orders but only have to lock once
@@ -294,16 +313,23 @@ Trades OrderBook::MatchOrders() {
 }
 
 //when an OrderBook object is created, automatically start the background pruning thread!
-OrderBook::OrderBook() : ordersPruneThread_{[this] { PruneGoodForDayOrders(); } } //starts a new thread
-{ } 
+OrderBook::OrderBook() : ordersPruneThread_{ [this] { PruneGoodForDayOrders(); } } { }
 
 //destructor! 
-OrderBook::~OrderBook() {
-    shutdown_.store(true, std::memory_order_release); //sets shutdown flag to true, tells background thread to stop running
-    shutdownConditionVariable_.notify_all(); //wake up the thread if its asleep!
-    if (ordersPruneThread_.joinable()) {
+OrderBook::~OrderBook()  {
+    std::cout << "destructor start\n";
+    {
+        std::unique_lock<std::mutex> lock(ordersMutex_);  //must hold the mutex while setting the flag as an atomic operation!
+        //otherwise could cause race condition + hanging thread
+        shutdown_.store(true, std::memory_order_release);
+    }
+    shutdownConditionVariable_.notify_all();  // notify AFTER releasing lock
+    std::cout << "before join\n";
+    
+    if (ordersPruneThread_.joinable()) { //
         ordersPruneThread_.join();
     }
+    std::cout << "after join\n";
     //wait until the thread finishes to continue destruction, otherwise thread will try to access things
 }
 
@@ -318,7 +344,6 @@ Trades OrderBook::AddOrder(OrderPointer order)
 {
     std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
     
-
     if(orders_.contains(order -> GetOrderId())) { //if the order already exists
         return { }; //return empty vector of trades
     }
