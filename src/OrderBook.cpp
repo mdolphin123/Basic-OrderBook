@@ -195,8 +195,8 @@ bool OrderBook::CanFullyFill(Side side, Price price, Quantity quantity) const {
 
     for(const auto& [levelPrice, levelData] : data_) { //go through all the levls
         if(threshold.has_value() && 
-        (side == Side::Buy && threshold.value() > levelPrice) ||
-        (side == Side::Sell && threshold.value() < levelPrice)) {
+        ((side == Side::Buy && threshold.value() > levelPrice) ||
+        (side == Side::Sell && threshold.value() < levelPrice))) {
             continue;
         } //invalid price levels (shouldnt be higher than best bid or lower than best ask!)
 
@@ -365,8 +365,11 @@ Trades OrderBook::AddOrder(OrderPointer order)
         return { }; //fill and kill but cannot be matched
     }
 
-    OrderPointers::iterator iterator; //stores where inside the linkedlist this order was inserted
+    if(order -> GetOrderType() == OrderType::FillorKill && !CanFullyFill(order -> GetSide(), order -> GetPrice(), order -> GetInitialQuantity())) {
+        return { };
+    }
 
+    OrderPointers::iterator iterator; //stores where inside the linkedlist this order was inserted
     
     if(order -> GetSide() == Side::Buy) { //buy side insertion!
         auto& orders = bids_[order -> GetPrice()];
