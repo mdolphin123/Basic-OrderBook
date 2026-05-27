@@ -50,34 +50,31 @@ void OrderBook::PruneGoodForDayOrders()
 		auto next = system_clock::from_time_t(mktime(&now_parts)); //converts back into timestamp
 		auto till = next - now + milliseconds(100); //if market is not closed, sleep until it closes! 100ms for safety
 
+        
 		{ //create a locked scope! Don't want the main thread to modify orders_ when we are pruning
 			std::cout << "in first lock" << std::endl;
-            std::unique_lock<std::mutex> ordersLock(ordersMutex_);  //creating unique lock object ordersLock, passing in the mutex
+            std::unique_lock<std::mutex> ordersLock(ordersMutex_); //acquire the mutex
 
-			/*if (shutdown_.load(std::memory_order_acquire) ||
-				shutdownConditionVariable_.wait_for(ordersLock, till) == std::cv_status::no_timeout) //thread gets put to sleep
-				return; //if shutdown requested, exit the pruning thread! Shutdown logic for the destructor
-            */
-            bool shouldShutdown = shutdownConditionVariable_.wait_for(ordersLock, till, [this] {
-                return shutdown_.load(std::memory_order_acquire);
-            });
+            bool shouldShutdown = shutdownConditionVariable_.wait_for(ordersLock, till, [this] { //checks why thread woke up
+                return shutdown_.load(std::memory_order_acquire); //sees if a shutdown was requested
+            }); 
                 
-            if (shouldShutdown) {
+            if (shouldShutdown) { //if we need to shutdown, exit the function (kills the background thread)
                 return;
             }
 		}
-        if (shutdown_.load(std::memory_order_acquire)) {
+        if (shutdown_.load(std::memory_order_acquire)) { //second check for shutdown in case
             return;
         }
         std::cout << "after first lock" << std::endl;
 
-		OrderIds orderIds;
+		OrderIds orderIds; //declaring empty list to store IDs of all good for day orders that need to be cancelled
 
-		{
+		{ //acquire the mutex again
 			std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
             std::cout << "in second lock" << std::endl;
 
-			for (const auto& [id, entry] : orders_)
+			for (const auto& [id, entry] : orders_) //read from orders!
 			{
 				const auto& [order, _] = entry;
 
@@ -88,15 +85,16 @@ void OrderBook::PruneGoodForDayOrders()
 			}
 		}
         std::cout << "after second lock" << std::endl;
-		CancelOrders(orderIds); //cancel these orders! get a new method named cancel ORDERS (multiple orders)
+		CancelOrders(orderIds); //cancel these orders! Note that we cancel them outside of the scope of the mutex
+        //so we dont recursive lock
 	}
 }
 
 //both of these functions make use of cancelorderinternal, which only cancels one order
 void OrderBook::CancelOrders(OrderIds orderIds) { //to cancel multiple orders but only have to lock once
-    std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
+    std::unique_lock<std::mutex> ordersLock(ordersMutex_); //acquire mutex
 
-    for (const auto& orderId: orderIds) {
+    for (const auto& orderId: orderIds) { //loop through the orders
         CancelOrderInternal(orderId); //cancel one order at a time
 
     }
@@ -104,21 +102,21 @@ void OrderBook::CancelOrders(OrderIds orderIds) { //to cancel multiple orders bu
 }
 
 //for if a trader cancels a order, helper function with NO lock!
-void OrderBook::CancelOrderInternal(OrderId orderId) {
+void OrderBook::CancelOrderInternal(OrderId orderId) { 
     if(!orders_.contains(orderId)) {
         return;
     }
     const auto& [order, orderIterator] = orders_.at(orderId); //gets the order and the order Iterator
     
-    if(order -> GetSide() == Side::Sell) {
+    if(order -> GetSide() == Side::Sell) { //for sell orders
         auto price = order -> GetPrice();
-        auto& orders = asks_.at(price);
-        orders.erase(orderIterator);
+        auto& orders = asks_.at(price); //finds price level in asks
+        orders.erase(orderIterator); //gets rid of those prices
         if(orders.empty()) { //if the price level is empty, we remove the ENTIRE price level
             asks_.erase(price);
         }
     }
-    if(order -> GetSide() == Side::Buy) {
+    if(order -> GetSide() == Side::Buy) { //same thing for buy side
         auto price = order -> GetPrice();
         auto& orders = bids_.at(price);
         orders.erase(orderIterator);
@@ -128,7 +126,7 @@ void OrderBook::CancelOrderInternal(OrderId orderId) {
     }
     
     OnOrderCancelled(order);
-    orders_.erase(orderId); //erases the order from the actual order queue
+    orders_.erase(orderId); //erases the order from the actual main order map
     
 }
 
@@ -147,7 +145,7 @@ void OrderBook::OnOrderMatched(Price price, Quantity quantity, bool isFullyFille
 }
 
 void OrderBook::UpdateLevelData(Price price, Quantity quantity, LevelData::Action action) {  
-    //pass in an action, recall the enum! This function is for level based data, aggregated info!
+    //aggregated data at each price level
 
     auto& data = data_[price]; //think dict in python! 
     //Retrieves the LevelData object associated with given price
