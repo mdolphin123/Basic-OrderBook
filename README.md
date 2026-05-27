@@ -1,1 +1,1 @@
-Orderbook in C++ with tests in gtest. Working on fixing multithreading issues in testing and adding further multithreading functionality and latency outputs. Will implement protocol to receive market data soon 
+Orderbook in C++ with tests in gtest. Working on implementing protocol to receive order data + adding more robust tests. Also adding latency measurements to improve design + efficiency
