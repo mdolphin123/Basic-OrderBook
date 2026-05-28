@@ -96,7 +96,6 @@ void OrderBook::CancelOrders(OrderIds orderIds) { //to cancel multiple orders bu
 
     for (const auto& orderId: orderIds) { //loop through the orders
         CancelOrderInternal(orderId); //cancel one order at a time
-
     }
 
 }
@@ -130,6 +129,7 @@ void OrderBook::CancelOrderInternal(OrderId orderId) {
     
 }
 
+//When an order is cancelled update the level data
 void OrderBook::OnOrderCancelled(OrderPointer order) {
     UpdateLevelData(order -> GetPrice(), order -> GetRemainingQuantity(), LevelData::Action::Remove);
 }
@@ -137,10 +137,10 @@ void OrderBook::OnOrderCancelled(OrderPointer order) {
 //general API
 void OrderBook::OnOrderMatched(Price price, Quantity quantity, bool isFullyFilled) {
     if(isFullyFilled) {
-        UpdateLevelData(price, quantity, LevelData::Action::Remove);
+        UpdateLevelData(price, quantity, LevelData::Action::Remove); //remove the order level
     }
     else {
-        UpdateLevelData(price, quantity, LevelData::Action::Match);
+        UpdateLevelData(price, quantity, LevelData::Action::Match); //update the level
     }
 }
 
@@ -234,7 +234,7 @@ bool OrderBook::CanMatch(Side side, Price price) const {
 }
 
 
-Trades OrderBook::MatchOrders() {
+Trades OrderBook::MatchOrders() { //actually do the matches
     Trades trades;
     trades.reserve(orders_.size());
 

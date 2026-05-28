@@ -4,9 +4,11 @@
 #include <stdexcept>
 #include <vector>
 
+#include "itch/messages.hpp"
+#include "itch/parser.hpp"   
+
 //use namespace so you can reuse variables, new C++ style
 namespace itch {
-
 
 namespace utils {
     //saves stack overhead, use inline
@@ -78,6 +80,10 @@ namespace utils {
 
     }
 } //end of namespace
+
+auto unpack_message(SystemEventMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.event_code = utils::unpack<char>(buffer, offset);
+}
 
 
 
