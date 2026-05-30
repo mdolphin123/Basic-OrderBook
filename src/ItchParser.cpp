@@ -81,12 +81,203 @@ namespace utils {
     }
 } //end of namespace
 
-auto unpack_message(SystemEventMessage& msg, const char* buffer, size_t& offset) -> void {
+auto unpack_message(SystemEventMessage& msg, const char* buffer, size_t& offset) -> void { //reads event code byte
     msg.event_code = utils::unpack<char>(buffer, offset);
 }
 
+auto unpack_message(StockDirectoryMessage& msg, const char* buffer, size_t& offset) -> void { //unpacks the stock
+    //directory message, tells you state of market 
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.market_category = utils::unpack<char>(buffer, offset);
+    msg.financial_status_indicator = utils::unpack<char>(buffer, offset);
+    msg.round_lot_size = utils::unpack<uint32_t> (buffer, offset);
+    msg.round_lots_only = utils::unpack<char> (buffer, offset);
+    msg.issue_clarification = utils::unpack<char>(buffer, offset);
 
+    utils::unpack_string(buffer, offset, msg.issue_sub_type, 2);
+    msg.authenticity = utils::unpack<char>(buffer, offset);
+    msg.short_sale_threshold_indicator = utils::unpack<char>(buffer, offset);
+    msg.ipo_flag = utils::unpack<char> (buffer, offset);
+    msg.luld_ref = utils::unpack<char> (buffer, offset);
+    msg.etp_flag = utils::unpack<char> (buffer, offset);
+    msg.etp_leverage_factor = utils::unpack<uint32_t> (buffer, offset);
+    msg.inverse_indicator = utils::unpack<char> (buffer, offset);
 
+}
+
+//unpacks stock action trading message! Tells system when a stock's trading status changes during the day, e.g. stock gets halted
+auto unpack_message(StockTradingActionMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.trading_state = utils::unpack<char>(buffer, offset);
+    msg.reserved = utils::unpack<char>(bfufer, offset);
+    utils::unpack_string(buffer, offset, msg.reason, 4);
+
+}
+
+//unpacks Reg SHO message: tells you if your system if short selling is restricted for a certain stock!
+auto unpack_message(StockTradingMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.reg_sho_action = utils::unpack<char>(buffer, offset);
+}
+
+//unpacks market position message: tells your system what role a specific market maker is playing for a stock
+auto unpack_message(MessageParticipantPositionMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.mpid, 4);
+    utils::unpack_string(buffer, offset, msg. stock, STOCK_LEN);
+    msg.primary_market_maker = utils::unpack<char>(buffer, offset);
+    msg.market_maker_mode = utils::unpack<char>(buffer, offset);
+    msg.market_participant_state = utils::unpack<char>(buffer, offset);
+}
+
+//This unpacks a Market Wide Circuit Breaker Decline Level Message, tells system at what price levels the entire market will be halted
+auto unpack_message(MWCBDeclineLevelMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.level1 = utils::unpack<uint64_t>(buffer, offset);
+    msg.level2 = utils::unpack<uint64_t>(buffer, offset);
+    msg.level3 = utils::unpack<uint64_t>(buffer, offset);
+}
+
+//This unpacks a Market Wide Circuit Breaker Status Level Message, tells system at what price levels the entire market will be halted
+//Very similar to previous one!
+auto unpack_message(MCWBStatusMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.breached_level = utils::unpack<char>(buffer, offset);
+}
+
+//Tells system about stock IPO opening process
+auto unpack_message(IPOQuotingPeriodUpdateMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.ipo_quotation_release_time = utils::unpack<uint32_t>(buffer, offset);
+    msg.ipo_quotation_release_qualifier = utils::unpack<char>(buffer, offset);
+    msg.ipo_price = utils::unpack<uint32_t>(buffer, offset);
+}
+
+//Defines price boundaries for a stock during Limit Up Limit Down halt auction
+auto unpack_message(LULDAuctionCollarMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.auction_collar_reference_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.upper_auction_collar_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.lower_auction_collar_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.auction_collar_extension = utils::unpack<uint32_t>(buffer, offset);
+}
+
+//Unpacks operational halt message, tells system when stock is halted bc of technical or operational issue 
+auto unpack_message(OperationalHaltMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.market_code = utils::unpack<char>(buffer, offset);
+    msg.operational_halt_action = utils::unpack<char>(buffer, offset);
+}
+//Important!! AddOrder message, basically someone submits an order!
+auto unpack_message(AddOrderMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.buy_sell_indicator = utils::unpack<char>(buffer, offset);
+    msg.shares = utils::unpack<uint32_t>(buffer, offset);
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.price = utils::unpack<uint32_t>(buffer, offset);
+}
+
+//Similar to previous (AddOrderMessage), but has extra attribution field at the end! Identifies which firm placed the order
+auto unpack_message(AddOrderMPIDAttributionMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.buy_sell_indicator = utils::unpack<char>(buffer, offset);
+    msg.shares = utils::unpack<uint32_t>(buffer, offset);
+
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.price = utils::unpack<uint32_t>(buffer, offset);
+    utils::unpack_string(buffer, offset, msg.attribution, 4);
+}
+
+//Also important! Tells your system that an order was actually traded
+auto unpack_message(OrderExecutedMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.executed_shares = utils::unpack<uint32_t>(buffer, offset);
+    msg.match_number = utils::unpack<uint64_t>(buffer, offset);
+}
+
+//Similar to order unpack, just with extra fields! Occurs if execution price differs from original orders
+auto unpack_message(OrderExecutedWithPriceMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.executed_shares = utils::unpack<uint32_t>(buffer, offset);
+    msg.match_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.printable = utils::unpack<char>(buffer, offset);
+    msg.execution_price = utils::unpack<uint32_t>(buffer, offset);
+}
+
+//Order cancellation message! Cancels shares
+auto unpack_message(OrderCancelMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.cancelled_shares = utils::unpack<uint32_t>(buffer, offset);
+}
+
+//Also an order cancellation message. Simply removes an order from the book 
+auto unpack_message(OrderDeleteMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+}
+
+//Order replacement aka order modification message! If trader modifies their message
+auto unpack_message(OrderReplaceMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.original_order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.new_order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.shares = utils::unpack<uint32_t>(buffer, offset);
+    msg.price = utils::unpack<uint32_t>(buffer, offset);
+}
+
+//Unpacks non cross trade message, a trade that happened outside the regular orderbook
+auto unpack_message(NonCrossTradeMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.order_reference_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.buy_sell_indicator = utils::unpack<char>(buffer, offset);
+    msg.shares = utils::unpack<uint32_t>(buffer, offset);
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.price = utils::unpack<uint32_t>(buffer, offset);
+    msg.match_number = utils::unpack<uint64_t>(buffer, offset);
+}
+
+//Unpacks cross trade message: a trade that happens during special auction period
+auto unpack_message(CrossTradeMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.shares = utils::unpack<uint64_t>(buffer, offset);
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+
+    msg.cross_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.match_number = utils::unpack<uint64_t>(buffer, offset);
+    msg.cross_type = utils::unpack<char>(buffer, offset);
+}
+
+//Cancels previously reported trade 
+auto unpack_message(BrokenTradeMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.match_number = utils::unpack<uint64_t>(buffer, offset);
+}
+
+//Unpacks net order imbalance indicator message! Tells system about order imbalances during auction periods
+auto unpack_message(NOIIMessage& msg, const char* buffer, size_t& offset) -> void {
+    msg.paired_shares = utils::unpack<uint64_t>(buffer, offset);
+    msg.imbalance_shares = utils::unpack<uint64_t>(buffer, offset);
+    msg.imbalance_direction = utils::unpack<char>(buffer, offset);
+
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+
+    msg.far_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.near_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.current_reference_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.cross_type = utils::unpack<char>(buffer, offset);
+    msg.price_variation_indicator = utils::unpack<char>(buffer, offset);
+}
+
+//Unpacks Retail Price Improvement Indicator Message! Tells retail traders when they can
+//get a better price than displayed in the book
+using RPIMsg = RetailPriceImprovementIndicatorMessage;
+auto unpack_message(RPIMsg& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.interest_flag = utils::unpack<char>(buffer, offset);
+}
+
+//Unpacks direct listing capital raise message: for companies doing a direct listing on Nasdaq
+auto unpack_message(DLCRMessage& msg, const char* buffer, size_t& offset) -> void {
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
+    msg.open_eligibility_status = utils::unpack<char>(buffer, offset);
+    msg.minimum_allowable_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.maximum_allowable_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.near_execution_price = utils::unpack<uint32_t>(buffer, offset);
+    msg.near_execution_time = utils::unpack<uint64_t>(buffer, offset);
+    msg.lower_price_range_collar = utils::unpack<uint32_t>(buffer, offset);
+    msg.upper_price_range_collar = utils::unpack<uint32_t>(buffer, offset);
 }
 
 
