@@ -280,4 +280,22 @@ auto unpack_message(DLCRMessage& msg, const char* buffer, size_t& offset) -> voi
     msg.upper_price_range_collar = utils::unpack<uint32_t>(buffer, offset);
 }
 
+//Register handler for each message type!
+template <typename T>; //T is the message struct, type is the char that identifies it
+auto Parser::register_handler(char type) -> void {
+    m_handlers[type] = [](const char* buffer) -> Message { //lambda function in handlers map, m_handlers is a map!
+        //key of m_handlers is the message type, value is the function that knows how to unpack the msg
+        T msg; //create empty struct of what type T is 
+        size_t offset = 1; //skip byte 0, the message type we used already (read before function call)
+
+        //common headers for every message!
+        msg.stock_locate = utils::unpack<uint16_t>(buffer, offset);
+        msg.tracking_number = utils::unpack<uint16_t>(buffer, offset);
+        msg.timestamp = utils::unpack<uint16_t>(buffer, offset);
+
+
+        unpack_message(msg, buffer, offset);
+        return msg;
+    };
+}
 
