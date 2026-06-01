@@ -33,6 +33,38 @@
 
 class OrderBook {
     private: 
+        //For latency measurements!!!
+        struct LatencyMeasurement {
+            std::atomic<uint64_t> count { 0 };
+            std::atomic<uint64_t> totalMicros { 0 };
+            std::atomic<uint64_t> maxMicros { 0 };
+
+            void Record(uint64_t micros) {
+                count.fetch_add(1, std::memory_order_relaxed);
+                totalMicros.fetch_add(micros, std::memory_order_relaxed);
+
+                uint64_t current = maxMicros.load(std::memory_order_relaxed);
+                while(micros > current && !maxMicros.compare_exchange_weak(current, micros, std::memory_order_relaxed)) {}
+            }
+
+            double AverageMicros() const {
+                auto c = count.load();
+                if(c == 0) {
+                    return 0.0;
+                }
+                else {
+                    return (double)totalMicros.load()/c;
+                }
+            }
+        };
+
+        LatencyMeasurement addOrderStats_;
+        LatencyMeasurement cancelOrderStats_;
+        LatencyMeasurement modifyOrderStats_;
+
+        using Func = std::function<Trades()>;
+        auto MeasureLatency(LatencyMeasurement& stats, Func&& func);
+        
         //made so we can quickly locate the order by imediately finding the order and its location
         struct OrderEntry {
             OrderPointer order_{ nullptr }; //pointer to actual order object

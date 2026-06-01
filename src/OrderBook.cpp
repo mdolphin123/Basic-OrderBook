@@ -134,7 +134,7 @@ void OrderBook::OnOrderCancelled(OrderPointer order) {
     UpdateLevelData(order -> GetPrice(), order -> GetRemainingQuantity(), LevelData::Action::Remove);
 }
 
-//general API
+//general API, on order matched
 void OrderBook::OnOrderMatched(Price price, Quantity quantity, bool isFullyFilled) {
     if(isFullyFilled) {
         UpdateLevelData(price, quantity, LevelData::Action::Remove); //remove the order level
@@ -218,7 +218,7 @@ bool OrderBook::CanMatch(Side side, Price price) const {
         else {
             const auto& [bestAsk, _] = *asks_.begin(); //dereferences the elements, we only care abt the first one!
             //.begin() returns an iterator that we have to dereference
-            return price >= bestAsk;
+            return price >= bestAsk; //if price is at least best ask, we can match something
         }
     }
     else { //sell side or bids
@@ -227,7 +227,7 @@ bool OrderBook::CanMatch(Side side, Price price) const {
         }
         else {
             const auto& [bestBid, _] = *bids_.begin();
-            return price <= bestBid;
+            return price <= bestBid; //price is at most best bid, we can match something
         }
 
     }
@@ -236,13 +236,13 @@ bool OrderBook::CanMatch(Side side, Price price) const {
 
 Trades OrderBook::MatchOrders() { //actually do the matches
     Trades trades;
-    trades.reserve(orders_.size());
+    trades.reserve(orders_.size()); //preallocate empty memory for trades
 
-    while (!bids_.empty() && !asks_.empty()) { 
-        auto& [bidPrice, bids] = *bids_.begin();
-        auto& [askPrice, asks] = *asks_.begin();
+    while (!bids_.empty() && !asks_.empty()) {  //keep looping while there are buyers and sellers
+        auto& [bidPrice, bids] = *bids_.begin(); //best bid
+        auto& [askPrice, asks] = *asks_.begin(); //lowest ask
 
-        if (bidPrice < askPrice) {
+        if (bidPrice < askPrice) { //spread check: if bid is below ask, no matches possible!
             break;
         }
 
@@ -254,26 +254,31 @@ Trades OrderBook::MatchOrders() { //actually do the matches
         auto bidPriceExec = bid->GetPrice(); //price of best bid
         auto askPriceExec = ask->GetPrice(); //price of best bid
 
-        Quantity quantity = std::min( //try to match best bid with best ask!
+        Quantity quantity = std::min( //number of shares to trade (smaller of the two)
             bid->GetRemainingQuantity(),
             ask->GetRemainingQuantity()
         );
-
+        
+        //reduce remaining quantity on both orders
         bid->Fill(quantity);
         ask->Fill(quantity);
 
+        //check if either order was done 
         bool bidFilled = bid->IsFilled(); //if successfully filled or not
         bool askFilled = ask->IsFilled();
 
+        //record both sides of the trade (bid and ask)!
         trades.push_back(Trade{
             TradeInfo{bidId, bidPriceExec, quantity},
             TradeInfo{askId, askPriceExec, quantity}
         });
 
+        //notifies the rest of the system an order was matched
         OnOrderMatched(bidPriceExec, quantity, bidFilled);
         OnOrderMatched(askPriceExec, quantity, askFilled);
 
-        if (bidFilled) {
+        //remove the empty price levels
+        if (bidFilled) { 
             bids.pop_front();
             orders_.erase(bidId);
         }
@@ -283,6 +288,7 @@ Trades OrderBook::MatchOrders() { //actually do the matches
             orders_.erase(askId);
         }
 
+        //removes the levels if they are filled!
         if (bids.empty()) { //clean up empty price levels!
             bids_.erase(bidPrice);
         }
