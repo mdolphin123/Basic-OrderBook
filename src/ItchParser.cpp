@@ -299,3 +299,74 @@ auto Parser::register_handler(char type) -> void {
     };
 }
 
+//Parser constructor, register a handler for every single itch message type!
+Parser::Parser() {
+    register_handler<SystemEventMessage>('S');
+    register_handler<StockDirectoryMessage>('R');
+    register_handler<StockTradingActionMessage>('H');
+    register_handler<RegSHOMessage>('Y');
+    register_handler<MarketParticipantPositionMessage>('L');
+    register_handler<MWCBDeclineLevelMessage>('V');
+    register_handler<MWCBStatusMessage>('W');
+    register_handler<IPOQuotingPeriodUpdateMessage>('K');
+    register_handler<LULDAuctionCollarMessage>('J');
+    register_handler<OperationalHaltMessage>('h');
+    register_handler<AddOrderMessage>('A');
+    register_handler<AddOrderMPIDAttributionMessage>('F');
+    register_handler<OrderExecutedMessage>('E');
+    register_handler<OrderExecutedWithPriceMessage>('C');
+    register_handler<OrderCancelMessage>('X');
+    register_handler<OrderDeleteMessage>('D');
+    register_handler<OrderReplaceMessage>('U');
+    register_handler<NonCrossTradeMessage>('P');
+    register_handler<CrossTradeMessage>('Q');
+    register_handler<BrokenTradeMessage>('B');
+    register_handler<NOIIMessage>('I');
+    register_handler<RetailPriceImprovementIndicatorMessage>('N');
+    register_handler<DLCRMessage>('O');
+    //register_handler creates a function + stores it in one line so parser can later look it up by message type
+}
+
+
+//Parse itch bytes into C++ ITCH structs (intermediate step before orderbook)
+auto Parser::parse(const char* data, size_t size, const MessageCallback& callback) -> void {
+    size_t offset = 0; //start of buffer
+    while (offset < size) { //keep looping
+        if (offset + sizeof(uint16_t) > size) { //make sure there are at least 2 bytes left!
+            throw std::runtime_error("Incomplete message header at end of buffer.");
+        }
+        uint16_t length {}; //reads 2 length byte prefix of ITCH message
+        std::memcpy(&length, data + offset, sizeof(length)); //copy 2 bytes into empty itch message
+        length = utils::from_big_endian(length); //convert bytes from big to little endian
+        offset += sizeof(uint16_t); //add to offset, move it forward
+
+        if (length == 0) { //skip empty messages
+            continue;
+        }
+
+        if (offset + length > size) { //make sure the full message fits
+            throw std::runtime_error("Incomplete message at end of buffer.");
+        }
+        const char* message = data + offset; //points to start of current message
+        const char  message_type = message[0]; //reads first byte of messages
+
+        auto handler_it = m_handlers.find(message_type); //find the message type in the map
+        if (handler_it != m_handlers.end()) {  //makes sure a handler was actually found
+            callback(handler_it->second(message)); //passes filled struct to who called parse
+        } else {
+            std::cerr << "Unknown or unhandled message type: " << message_type << '\n'; //no handler found, log and keep going
+        }
+        offset += length; //move to the next message
+    }
+}
+//overloaded, another parser
+constexpr size_t average_message_size = 20; //preallocate memory (guess)
+auto Parser::parse(const char* data, size_t size) -> std::vector<Message> {
+    std::vector<Message> messages; //vector of messages, this method just puts messages into a vector
+    messages.reserve(size / average_message_size);
+    parse(data, size, [&](const Message& msg) { messages.push_back(msg); });
+    return messages;
+}
+
+
+
