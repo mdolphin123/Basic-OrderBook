@@ -359,14 +359,69 @@ auto Parser::parse(const char* data, size_t size, const MessageCallback& callbac
         offset += length; //move to the next message
     }
 }
-//overloaded, another parser
+//overloaded, another parser that collects everything into a vector
 constexpr size_t average_message_size = 20; //preallocate memory (guess)
 auto Parser::parse(const char* data, size_t size) -> std::vector<Message> {
     std::vector<Message> messages; //vector of messages, this method just puts messages into a vector
     messages.reserve(size / average_message_size);
     parse(data, size, [&](const Message& msg) { messages.push_back(msg); });
-    return messages;
+    return messages; 
 }
+
+//another overloaded parser
+auto Parser::parse(const char* data, size_t size, const std::vector<char>& messages) -> std::vector<Message> {
+    std::vector<Message> results;
+    std::set<char> filter(messages.begin(), messages.end()); //converts vector -> set
+
+    if (filter.empty()) {
+        return results;
+    }
+    results.reserve(size / average_message_size); 
+
+    auto callback = [&](const Message& msg) {
+        char message_type = std::visit([](auto&& arg) { return arg.message_type; }, msg); //filtering lambda
+        if (filter.contains(message_type)) { //if msg type is contained, push it back
+            results.push_back(msg);
+        }
+    };
+    
+    parse(data, size, callback); //main parse with filtering callback
+    return results;
+}
+
+//reads entire file stream -> memory
+static auto read_stream_into_buffer(std::istream& data) -> std::vector<char> {
+    data.seekg(0, std::ios::end); //moves to end of stream to see how big it is
+    auto size = data.tellg(); //gives file size
+    data.seekg(0, std::ios::beg); //moves back to beginning
+    if (size < 0) {
+        throw std::runtime_error("Failed to determine stream size.");
+    }
+    std::vector<char> buffer(static_cast<size_t>(size)); //create vector to hold entire file
+    data.read(buffer.data(), size); //reads entire file into buffer
+    return buffer; //returns file as byte vector
+}
+
+
+//thin reader, connects stream reader -> parser
+auto Parser::parse(std::istream& data, const MessageCallback& callback) -> void {
+    auto buffer = read_stream_into_buffer(data); //loads entire file into memory
+    parse(buffer.data(), buffer.size(), callback); //calls main parse with loaded bytes
+}
+
+//takes a stream, returns all msgs as vector
+auto Parser::parse(std::istream& data) -> std::vector<Message> {
+    auto buffer = read_stream_into_buffer(data);
+    return parse(buffer.data(), buffer.size());
+}
+
+//filtered version for file streamds
+auto Parser::parse(std::istream& data, const std::vector<char>& messages) -> std::vector<Message> {
+    auto buffer = read_stream_into_buffer(data);
+    return parse(buffer.data(), buffer.size(), messages);
+}
+
+
 
 
 
