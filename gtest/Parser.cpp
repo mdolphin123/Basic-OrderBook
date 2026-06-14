@@ -10,6 +10,10 @@
 #include <format>
 #include <stdexcept>
 
+#include "../headers/Itchparser.h"
+#include "../headers/Indicators.h"
+#include "../headers/Messages.h"
+
 
 
 

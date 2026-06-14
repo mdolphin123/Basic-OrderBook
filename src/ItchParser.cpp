@@ -4,8 +4,9 @@
 #include <stdexcept>
 #include <vector>
 
-#include "itch/messages.hpp"
-#include "itch/parser.hpp"   
+#include "../headers/Itchparser.h"
+#include "../headers/Indicators.h"
+#include "../headers/Messages.h"
 
 //use namespace so you can reuse variables, new C++ style
 namespace itch {
@@ -16,14 +17,14 @@ namespace utils {
     inline auto is_little_endian() -> bool {
         #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
             return true
-        #elif define(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        #elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
             return false
         #else
             const union {
                 uint32_t i;
                 char c[4];
             }
-            bint = {0x01020304} //fill the struct, hex notation!
+            bint = {0x01020304}; //fill the struct, hex notation!
             return bint.c[0] == 4; //if 4, then it is little endian
         #endif
     }
@@ -109,7 +110,7 @@ auto unpack_message(StockDirectoryMessage& msg, const char* buffer, size_t& offs
 auto unpack_message(StockTradingActionMessage& msg, const char* buffer, size_t& offset) -> void {
     utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
     msg.trading_state = utils::unpack<char>(buffer, offset);
-    msg.reserved = utils::unpack<char>(bfufer, offset);
+    msg.reserved = utils::unpack<char>(buffer, offset);
     utils::unpack_string(buffer, offset, msg.reason, 4);
 
 }
@@ -419,6 +420,7 @@ auto Parser::parse(std::istream& data) -> std::vector<Message> {
 auto Parser::parse(std::istream& data, const std::vector<char>& messages) -> std::vector<Message> {
     auto buffer = read_stream_into_buffer(data);
     return parse(buffer.data(), buffer.size(), messages);
+}
 }
 
 
