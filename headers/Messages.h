@@ -17,7 +17,7 @@ namespace itch {
         uint16_t tracking_number; //Nasdaq internal sequence number
         uint64_t timestamp; //time since midnight msg was generated
         char event_code; //market event that happened
-    }
+    };
 
     struct StockDirectoryMessage { //Stock directory message in memory
         char message_type = 'R'; //Stock directory in ITCH
@@ -248,7 +248,7 @@ namespace itch {
     };
 
     struct RetailPriceImprovementIndicatorMessage {
-        char    message_type = 'N';
+        char message_type = 'N';
         uint16_t stock_locate;
         uint16_t tracking_number;
         uint64_t timestamp;
@@ -284,7 +284,7 @@ namespace itch {
         MWCBStatusMessage,
         IPOQuotingPeriodUpdateMessage,
         LULDAuctionCollarMessage,
-        perationalHaltMessage,
+        OperationalHaltMessage,
         AddOrderMessage,
         AddOrderMPIDAttributionMessage,
         OrderExecutedMessage,
@@ -348,6 +348,6 @@ namespace itch {
         //prints an itch message
         auto operator<<(std::ostream& out, const Message& msg) -> std::ostream&;
 
-};
+}
 
 

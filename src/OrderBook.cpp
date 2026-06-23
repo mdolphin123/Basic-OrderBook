@@ -126,7 +126,6 @@ void OrderBook::CancelOrderInternal(OrderId orderId) {
     
     OnOrderCancelled(order);
     orders_.erase(orderId); //erases the order from the actual main order map
-    
 }
 
 //When an order is cancelled update the level data

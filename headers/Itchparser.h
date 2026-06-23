@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Messages.h"
+#include "Indicators.h"
 
 //header file for parser! Defines structure
 
@@ -23,7 +24,7 @@ namespace itch {
             auto parse(const char* data, size_t size, const std::vector<char>& messages) -> std::vector<Message>;
             auto parse(std::istream& data, const MessageCallback& callback) -> void;
             auto parse(std::istream& data) -> std::vector<Message>;
-            auto parse(std::istream& data, const std::vector<char>& messages) -> std::vector<Message>
+            auto parse(std::istream& data, const std::vector<char>& messages) -> std::vector<Message>;
 
         private:
             using Handler = std::function<Message(const char*)>; //Type alias for handler
@@ -40,8 +41,7 @@ namespace itch {
             union { //unions with same memory!
                 T val;
                 uint8_t bytes[sizeof(T)];
-            } 
-            src, dst;
+            } src, dst;
             src.val = value; //put input value into src
             for (size_t i = 0; i < sizeof(T); ++i) {
                 dst.bytes[i] = src.bytes[sizeof(T) - 1 - i];
@@ -55,7 +55,7 @@ namespace itch {
         template <typename T> T unpack(const char* buffer, size_t& offset);
         inline void unpack_string(const char* buffer, size_t& offset, char* dest, size_t size);
         inline uint64_t unpack_timestamp(const char* buffer, size_t& offset);
-    };
+    }
 
 }
 

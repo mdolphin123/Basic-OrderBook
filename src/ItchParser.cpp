@@ -3,6 +3,8 @@
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
+
 
 #include "../headers/Itchparser.h"
 #include "../headers/Indicators.h"
@@ -16,9 +18,9 @@ namespace utils {
     //do the endian conversion in preprocessing to save time at runtime, check byte order once!
     inline auto is_little_endian() -> bool {
         #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-            return true
+            return true;
         #elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-            return false
+            return false;
         #else
             const union {
                 uint32_t i;
@@ -48,7 +50,7 @@ namespace utils {
         //note buffer always points to the start
         offset += sizeof(T); //move offset
 
-        if constexpr(std::is_integral_v<T>> && sizeof(T) > 1) { //if it is a multibyte number, just convert it
+        if constexpr(std::is_integral_v<T> && sizeof(T) > 1) { //if it is a multibyte number, just convert it
             return from_big_endian(value);
         }
         else {
@@ -71,6 +73,8 @@ namespace utils {
         std::memcpy(&high, buffer + offset, sizeof(high)); //copying into high
         offset += sizeof(high);
         std::memcpy(&low, buffer + offset, sizeof(low));
+        offset += sizeof(low);
+        
 
         //convert from big endian
         high = from_big_endian(high);
@@ -93,7 +97,7 @@ auto unpack_message(StockDirectoryMessage& msg, const char* buffer, size_t& offs
     msg.financial_status_indicator = utils::unpack<char>(buffer, offset);
     msg.round_lot_size = utils::unpack<uint32_t> (buffer, offset);
     msg.round_lots_only = utils::unpack<char> (buffer, offset);
-    msg.issue_clarification = utils::unpack<char>(buffer, offset);
+    msg.issue_classification = utils::unpack<char>(buffer, offset);
 
     utils::unpack_string(buffer, offset, msg.issue_sub_type, 2);
     msg.authenticity = utils::unpack<char>(buffer, offset);
@@ -116,15 +120,15 @@ auto unpack_message(StockTradingActionMessage& msg, const char* buffer, size_t& 
 }
 
 //unpacks Reg SHO message: tells you if your system if short selling is restricted for a certain stock!
-auto unpack_message(StockTradingMessage& msg, const char* buffer, size_t& offset) -> void {
+auto unpack_message(RegSHOMessage& msg, const char* buffer, size_t& offset) -> void {
     utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
     msg.reg_sho_action = utils::unpack<char>(buffer, offset);
 }
 
 //unpacks market position message: tells your system what role a specific market maker is playing for a stock
-auto unpack_message(MessageParticipantPositionMessage& msg, const char* buffer, size_t& offset) -> void {
+auto unpack_message(MarketParticipantPositionMessage& msg, const char* buffer, size_t& offset) -> void {
     utils::unpack_string(buffer, offset, msg.mpid, 4);
-    utils::unpack_string(buffer, offset, msg. stock, STOCK_LEN);
+    utils::unpack_string(buffer, offset, msg.stock, STOCK_LEN);
     msg.primary_market_maker = utils::unpack<char>(buffer, offset);
     msg.market_maker_mode = utils::unpack<char>(buffer, offset);
     msg.market_participant_state = utils::unpack<char>(buffer, offset);
@@ -139,7 +143,7 @@ auto unpack_message(MWCBDeclineLevelMessage& msg, const char* buffer, size_t& of
 
 //This unpacks a Market Wide Circuit Breaker Status Level Message, tells system at what price levels the entire market will be halted
 //Very similar to previous one!
-auto unpack_message(MCWBStatusMessage& msg, const char* buffer, size_t& offset) -> void {
+auto unpack_message(MWCBStatusMessage& msg, const char* buffer, size_t& offset) -> void {
     msg.breached_level = utils::unpack<char>(buffer, offset);
 }
 
@@ -282,7 +286,7 @@ auto unpack_message(DLCRMessage& msg, const char* buffer, size_t& offset) -> voi
 }
 
 //Register handler for each message type!
-template <typename T>; //T is the message struct, type is the char that identifies it
+template <typename T> //T is the message struct, type is the char that identifies it
 auto Parser::register_handler(char type) -> void {
     m_handlers[type] = [](const char* buffer) -> Message { //lambda function in handlers map, m_handlers is a map!
         //key of m_handlers is the message type, value is the function that knows how to unpack the msg
@@ -290,9 +294,9 @@ auto Parser::register_handler(char type) -> void {
         size_t offset = 1; //skip byte 0, the message type we used already (read before function call)
 
         //common headers for every message!
-        msg.stock_locate = utils::unpack<uint16_t>(buffer, offset);
-        msg.tracking_number = utils::unpack<uint16_t>(buffer, offset);
-        msg.timestamp = utils::unpack<uint16_t>(buffer, offset);
+        msg.stock_locate = utils::unpack_timestamp(buffer, offset);
+        msg.tracking_number = utils::unpack_timestamp(buffer, offset);
+        msg.timestamp = utils::unpack_timestamp(buffer, offset);
 
 
         unpack_message(msg, buffer, offset);
@@ -338,6 +342,7 @@ auto Parser::parse(const char* data, size_t size, const MessageCallback& callbac
         }
         uint16_t length {}; //reads 2 length byte prefix of ITCH message
         std::memcpy(&length, data + offset, sizeof(length)); //copy 2 bytes into empty itch message
+
         length = utils::from_big_endian(length); //convert bytes from big to little endian
         offset += sizeof(uint16_t); //add to offset, move it forward
 
