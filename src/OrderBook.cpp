@@ -25,6 +25,26 @@
 
 //Added background threads on all functions that modify orders_, bids_, or asks_ because there is a background thread!
 
+auto OrderBook::MeasureLatency(LatencyMeasurement& stats, Func&& func) {
+    //starts the timer
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    //run the function being timed
+    auto result = func();
+    
+    //stop the timer
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    //elapsed time
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    
+    //record into tracker
+    stats.Record(micros);
+    
+    //return what the function returned
+    return result;
+}
+
 
 void OrderBook::PruneGoodForDayOrders()
 {    
