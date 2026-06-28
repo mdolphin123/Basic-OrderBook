@@ -6,7 +6,6 @@
 #include <numeric>
 #include <memory>
 #include <variant>
-#include <optional>
 #include <tuple>
 #include <format>
 #include <list>
@@ -25,7 +24,8 @@
 
 //Added background threads on all functions that modify orders_, bids_, or asks_ because there is a background thread!
 
-auto OrderBook::MeasureLatency(LatencyMeasurement& stats, Func&& func) {
+auto OrderBook::MeasureLatency(LatencyMeasurement& stats, Func&& func) { //needs to return trades still like the function
+    //we are wrapping, this is just for timing!!!
     //starts the timer
     auto start = std::chrono::high_resolution_clock::now();
     
@@ -363,10 +363,10 @@ void OrderBook::OnOrderAdded(OrderPointer order) { //when an order is added, upd
 }
 
 
-Trades OrderBook::AddOrder(OrderPointer order) 
-{
+Trades OrderBook::AddOrder(OrderPointer order) {
+    return MeasureLatency(addOrderStats_, [&]() -> Trades {
     std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
-    
+
     if(orders_.contains(order -> GetOrderId())) { //if the order already exists
         return { }; //return empty vector of trades
     }
@@ -408,18 +408,27 @@ Trades OrderBook::AddOrder(OrderPointer order)
     
     OnOrderAdded(order);
     return MatchOrders();
+});
 }
 
 
 
-void OrderBook::CancelOrder(OrderId orderId) { //to cancel one order and only have to lock once
-    std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
-    CancelOrderInternal(orderId);
-
+void OrderBook::CancelOrder(OrderId orderId) { 
+    auto start = std::chrono::high_resolution_clock::now();
+    {
+        //to cancel one order and only have to lock once
+        std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
+        CancelOrderInternal(orderId);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    cancelOrderStats_.Record(micros);
+    
 }
 
 
 Trades OrderBook::ModifyOrder(OrderModify order) {
+    return MeasureLatency(modifyOrderStats_, [&]() -> Trades {
     OrderType orderType;
     {
         std::unique_lock<std::mutex> ordersLock(ordersMutex_); 
@@ -431,6 +440,7 @@ Trades OrderBook::ModifyOrder(OrderModify order) {
     }
     CancelOrder(order.GetOrderId()); //cancels the old order
     return AddOrder(order.ToOrderPointer(orderType)); //returns and adds the new order
+});
 }
 
 OrderBookLevelInfos OrderBook::GetOrderInfos() const {
@@ -451,5 +461,22 @@ OrderBookLevelInfos OrderBook::GetOrderInfos() const {
         askInfos.push_back(CreateLevelInfos(price, orders));
     }
     return OrderBookLevelInfos{ bidInfos, askInfos}; //full summary
+}
+
+
+void OrderBook::PrintLatencyStats() const {
+    std::cout << "=== Latency Statistics ===\n\n";
+    std::cout << "AddOrder:\n"
+              << "  count:   " << addOrderStats_.count.load() << "\n"
+              << "  average: " << addOrderStats_.AverageMicros() << "us\n"
+              << "  max:     " << addOrderStats_.maxMicros.load() << "us\n\n";
+    std::cout << "CancelOrder:\n"
+              << "  count:   " << cancelOrderStats_.count.load() << "\n"
+              << "  average: " << cancelOrderStats_.AverageMicros() << "us\n"
+              << "  max:     " << cancelOrderStats_.maxMicros.load() << "us\n\n";
+    std::cout << "ModifyOrder:\n"
+              << "  count:   " << modifyOrderStats_.count.load() << "\n"
+              << "  average: " << modifyOrderStats_.AverageMicros() << "us\n"
+              << "  max:     " << modifyOrderStats_.maxMicros.load() << "us\n";
 }
 

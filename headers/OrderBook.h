@@ -18,6 +18,7 @@
 #include <thread>
 #include <condition_variable>
 #include <atomic>
+#include <chrono>
 
 
 #include "Usings.h"
@@ -130,5 +131,7 @@ class OrderBook {
 
         std::size_t Size() const { return orders_.size(); } //just gets size of order book (# of active orders)
         OrderBookLevelInfos GetOrderInfos() const;
+
+        void PrintLatencyStats() const;  //for printing latency
          
 };
