@@ -13,6 +13,7 @@
 #include <map>
 #include <cstdint>
 #include <cmath>
+#include <fstream>
 
 #include "Constants.h"
 #include "OrderType.h"
@@ -25,18 +26,31 @@
 #include "OrderModify.h"
 #include "Trade.h"
 #include "OrderBook.h"
+#include "ItchTranslator.h"
+#include "Itchparser.h"
 
 
 int main() {
-    OrderBook orderbook;
-    const OrderId orderId = 1;
-    orderbook.AddOrder(std::make_shared<Order>(OrderType::GoodTillCancel, orderId, Side::Buy, 100, 10));
-    std::cout <<orderbook.Size() <<std::endl; //endl means end line, print a new line!
-    orderbook.CancelOrder(orderId);
-    std::cout <<orderbook.Size() <<std::endl;
+    // create the three objects needed
+    itch::Parser parser;
+    OrderBook book;
+    ItchTranslator bridge(book);
+
+    // open the ITCH data file
+    std::ifstream file("nasdaq_itch.bin", std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open ITCH file\n";
+        return 1;
+    }
+
+    // parse every message and feed into order book
+    parser.parse(file, itch::MessageCallback{[&](const itch::Message& msg) {
+        bridge.process(msg);
+    }});
+
+    // print latency results after all messages processed
+    book.PrintLatencyStats();
+
     return 0;
 }
-    
-        
-
 
