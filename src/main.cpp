@@ -15,19 +15,19 @@
 #include <cmath>
 #include <fstream>
 
-#include "Constants.h"
-#include "OrderType.h"
-#include "Usings.h"
-#include "LevelInfo.h"
-#include "Side.h"
-#include "OrderBookLevelInfos.h"
-#include "TradeInfo.h"
-#include "Order.h"
-#include "OrderModify.h"
-#include "Trade.h"
-#include "OrderBook.h"
-#include "ItchTranslator.h"
-#include "Itchparser.h"
+#include "../headers/Constants.h"
+#include "../headers/OrderType.h"
+#include "../headers/Usings.h"
+#include "../headers/LevelInfo.h"
+#include "../headers/Side.h"
+#include "../headers/OrderBookLevelInfos.h"
+#include "../headers/TradeInfo.h"
+#include "../headers/Order.h"
+#include "../headers/OrderModify.h"
+#include "../headers/Trade.h"
+#include "../headers/OrderBook.h"
+#include "../headers/ItchTranslator.h"
+#include "../headers/Itchparser.h"
 
 
 int main() {

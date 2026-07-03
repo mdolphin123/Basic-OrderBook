@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 include_directories(headers)
 include_directories(/opt/homebrew/include)
+include_directories(.)  # ← add this so OrderBook.h etc can be found
+
 
 link_directories(/opt/homebrew/lib)
 
@@ -13,6 +15,13 @@ add_executable(orderbook_tests
     src/OrderBook.cpp
     gtest/Tests.cpp
     gtest/Parser.cpp
+)
+
+add_executable(orderbook_main
+    src/main.cpp
+    src/OrderBook.cpp
+    src/ItchParser.cpp
+    src/ItchTranslator.cpp
 )
 
 target_link_libraries(orderbook_tests
