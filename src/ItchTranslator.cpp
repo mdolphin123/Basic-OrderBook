@@ -1,4 +1,4 @@
-#include "../headers/ItchTranslator.h";
+#include "../headers/ItchTranslator.h"
 #include <variant>
 #include <type_traits> 
 #include <memory> 
@@ -51,7 +51,7 @@ void ItchTranslator::handle_add(const itch::AddOrderMessage& m) { //translate it
         OrderType::GoodTillCancel,
         m.order_reference_number,
         to_side(m.buy_sell_indicator),
-        m.price,
+        static_cast<Price>(m.price),
         m.shares
     );
     book_.AddOrder(order); //call add order format!
@@ -62,7 +62,7 @@ void ItchTranslator::handle_add(const itch::AddOrderMPIDAttributionMessage& m) {
         OrderType::GoodTillCancel,
         m.order_reference_number,
         to_side(m.buy_sell_indicator),
-        m.price,
+        static_cast<Price>(m.price),
         m.shares
     );
     book_.AddOrder(order);
@@ -89,7 +89,7 @@ void ItchTranslator::handle_replace(const itch::OrderReplaceMessage& m) { //orde
     OrderModify modify{
         m.original_order_reference_number,
         Side::Buy,  // book looks up actual side internally
-        m.price,
+        static_cast<Price>(m.price),
         m.shares
     };
     book_.ModifyOrder(modify); //modify the order
