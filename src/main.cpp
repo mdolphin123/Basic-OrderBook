@@ -37,7 +37,7 @@ int main() {
     ItchTranslator bridge(book);
 
     // open the ITCH data file
-    std::ifstream file("nasdaq_itch.bin", std::ios::binary);
+    std::ifstream file("/Users/jocelyn/Downloads/tvagg", std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Failed to open ITCH file\n";
         return 1;
